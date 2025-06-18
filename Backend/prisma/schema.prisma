@@ -7,30 +7,37 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  USER
+  ADMIN
+  THEATRE_OWNER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
 model User {
   id         Int       @id @default(autoincrement())
   name       String
   email      String    @unique
-  password   String
+  password   String?
+  role       UserRole  @default(USER)
   bookings   Booking[]
+  theatres   Theatre[] @relation("OwnerTheatres")
+  
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
-}
-
-model Movie {
-  id          Int       @id @default(autoincrement())
-  title       String
-  description String?
-  duration    Int       // in minutes
-  shows       Show[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
 }
 
 model Theatre {
   id        Int       @id @default(autoincrement())
   name      String
   location  String
+  owner     User?     @relation("OwnerTheatres", fields: [ownerId], references: [id])
+  ownerId   Int?  
   screens   Screen[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -49,12 +56,35 @@ model Screen {
 
 model Seat {
   id          Int          @id @default(autoincrement())
-  seatNo      String       // e.g. "A1", "B5"
+  seatNo      String
   screen      Screen       @relation(fields: [screenId], references: [id])
   screenId    Int
-  bookedSeats BookedSeat[] // ↩️ reverse relation for BookedSeat
+  bookedSeats BookedSeat[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+
+  @@unique([seatNo, screenId]) 
+}
+
+model Movie {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  duration    Int
+  shows       Show[]
+  posters     Poster[] // 👈 Poster relation added
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Poster {
+  id         Int      @id @default(autoincrement())
+  movie      Movie    @relation(fields: [movieId], references: [id])
+  movieId    Int
+  imageUrl   String   // URL or file path to the uploaded image
+  uploadedAt DateTime @default(now())
+
+  @@index([movieId])
 }
 
 model Show {
@@ -65,9 +95,12 @@ model Show {
   screenId    Int
   startTime   DateTime
   endTime     DateTime
+  price       Float    
   bookings    Booking[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([screenId, startTime]) 
 }
 
 model Booking {
@@ -93,11 +126,5 @@ model BookedSeat {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([bookingId, seatId]) // no duplicate seat in one booking
-}
-
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
+  @@unique([bookingId, seatId]) 
 }
